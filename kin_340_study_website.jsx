@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -570,7 +570,17 @@ function Flashcards() {
   return <Card className="rounded-3xl shadow-sm"><CardContent className="p-6"><div className="mb-4 flex items-center justify-between"><Badge>{card[0]}</Badge><span className="text-sm text-slate-500">{i + 1} / {flashcards.length}</span></div><div className="min-h-[180px] rounded-2xl bg-gradient-to-br from-slate-100 to-white p-6"><p className="text-xl font-semibold text-slate-900">{card[1]}</p>{show && <motion.p initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="mt-6 text-lg text-slate-700">{card[2]}</motion.p>}</div><div className="mt-5 flex flex-wrap gap-3"><Button onClick={() => setShow(!show)}>{show ? "Hide answer" : "Show answer"}</Button><Button variant="outline" onClick={() => { setI((i + 1) % flashcards.length); setShow(false); }}>Next</Button><Button variant="outline" onClick={() => { setI((i - 1 + flashcards.length) % flashcards.length); setShow(false); }}>Previous</Button><Button variant="ghost" onClick={() => { setI(0); setShow(false); }}><RotateCcw className="mr-2 h-4 w-4" />Reset</Button></div></CardContent></Card>;
 }
 
-function SectionJumpNav({ items }) {
+function SectionJumpNav({ items, title, subtitle }) {
+  const headerRef = useRef(null);
+  const [showSideNav, setShowSideNav] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(false);
+  const sideLabelMap = {
+    "Exercise Order": "Order",
+    "Acute Variables": "Acute Vars",
+    "Rep-Intensity Relationship": "Rep-Intensity",
+    "Reps to %1RM": "Reps %1RM"
+  };
+
   const jumpTo = (id) => {
     const target = document.getElementById(id);
     if (target) {
@@ -578,20 +588,71 @@ function SectionJumpNav({ items }) {
     }
   };
 
+  useEffect(() => {
+    const onScroll = () => {
+      if (!headerRef.current) return;
+      const { bottom } = headerRef.current.getBoundingClientRect();
+      setShowSideNav(bottom < 0);
+    };
+
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
   return (
-    <Card className="rounded-3xl shadow-sm">
-      <CardContent className="p-6">
-        <h3 className="mb-3 text-xl font-bold">Jump to calculator section</h3>
-        <p className="mb-4 text-sm text-slate-600">Click any header to scroll to that section.</p>
-        <div className="flex flex-wrap gap-2">
-          {items.map((item) => (
-            <Button key={item.id} variant="outline" onClick={() => jumpTo(item.id)}>
-              {item.label}
-            </Button>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
+    <>
+      <Card className="rounded-3xl shadow-sm" ref={headerRef}>
+        <CardContent className="p-6">
+          <h3 className="mb-3 text-xl font-bold">{title}</h3>
+          <p className="mb-4 text-sm text-slate-600">{subtitle}</p>
+          <div className="flex flex-wrap gap-2">
+            {items.map((item) => (
+              <Button key={item.id} variant="outline" onClick={() => jumpTo(item.id)}>
+                {item.label}
+              </Button>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+      {showSideNav && (
+        <>
+          {isMinimized ? (
+            <div className="fixed right-6 top-28 z-30 hidden lg:block">
+              <Button size="sm" variant="outline" onClick={() => setIsMinimized(false)}>
+                Sections
+              </Button>
+            </div>
+          ) : (
+            <div className="fixed right-6 top-28 z-30 hidden w-44 max-h-[70vh] overflow-y-auto rounded-2xl border bg-white/90 p-3 shadow-sm backdrop-blur lg:block">
+              <div className="mb-2 flex items-center justify-between">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Sections</p>
+                <Button size="sm" variant="ghost" onClick={() => setIsMinimized(true)}>
+                  &gt;
+                </Button>
+              </div>
+              <div className="flex flex-col gap-1">
+                {items.map((item) => {
+                  const label = sideLabelMap[item.label] || item.label;
+                  return (
+                    <Button
+                      key={`${item.id}-side`}
+                      size="sm"
+                      variant="ghost"
+                      className="justify-start truncate"
+                      title={item.label}
+                      onClick={() => jumpTo(item.id)}
+                    >
+                      {label}
+                    </Button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </>
   );
 }
 
@@ -863,7 +924,7 @@ export default function KIN340StudyWebsite() {
   ].filter(([term, def]) => `${term} ${def}`.toLowerCase().includes(query.toLowerCase())), [query]);
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
+    <div className="min-h-screen overflow-x-hidden bg-slate-50 text-slate-900">
       <header className="border-b bg-white">
         <div className="mx-auto max-w-7xl px-5 py-8">
           <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
@@ -900,7 +961,11 @@ export default function KIN340StudyWebsite() {
           </TabsList>
           <TabsContent value="reference" className="space-y-8">
             <SectionTitle icon={BookOpen} title="Reference tables" subtitle="Classification tables and authority rules from the course material." />
-            <SectionJumpNav items={referenceSections} />
+            <SectionJumpNav
+              items={referenceSections}
+              title="Jump to reference section"
+              subtitle="Click a section to scroll to its table."
+            />
             <div className="grid gap-6">
               <div id="ref-bp" className="scroll-mt-24">
                 <Card className="rounded-3xl shadow-sm">
@@ -1027,7 +1092,11 @@ export default function KIN340StudyWebsite() {
           </TabsContent>
           <TabsContent value="periodization" className="space-y-8">
             <SectionTitle icon={Layers} title="Periodization logic" subtitle="Client screening, experience classification, focus selection, and phase sequences." />
-            <SectionJumpNav items={periodizationSections} />
+            <SectionJumpNav
+              items={periodizationSections}
+              title="Jump to periodization section"
+              subtitle="Click a section to scroll to phase guidance."
+            />
             <div id="period-goals" className="scroll-mt-24">
               <Card className="rounded-3xl shadow-sm">
                 <CardContent className="p-6">
@@ -1105,7 +1174,11 @@ export default function KIN340StudyWebsite() {
           </TabsContent>
           <TabsContent value="prescription" className="space-y-8">
             <SectionTitle icon={Dumbbell} title="Resistance training prescription" subtitle="Exercise order, acute variables, and class-specific rules." />
-            <SectionJumpNav items={prescriptionSections} />
+            <SectionJumpNav
+              items={prescriptionSections}
+              title="Jump to prescription section"
+              subtitle="Click a section to scroll to the training rules."
+            />
             <div id="rx-order" className="scroll-mt-24">
               <Card className="rounded-3xl shadow-sm">
                 <CardContent className="p-6">
@@ -1155,7 +1228,11 @@ export default function KIN340StudyWebsite() {
           </TabsContent>
           <TabsContent value="calculators" className="space-y-8">
             <SectionTitle icon={Calculator} title="Calculator hub" subtitle="Course-rule calculators for final exam style problems." />
-            <SectionJumpNav items={calculatorSections} />
+            <SectionJumpNav
+              items={calculatorSections}
+              title="Jump to calculator section"
+              subtitle="Click a section to scroll to its calculator."
+            />
             <div id="calc-classification" className="scroll-mt-24">
               <ClassificationCalculator />
             </div>
@@ -1200,7 +1277,11 @@ export default function KIN340StudyWebsite() {
           </TabsContent>
           <TabsContent value="flashcards" className="space-y-8">
             <SectionTitle icon={Brain} title="Final exam flashcards" subtitle="Definitions, formulas, and professor-style traps from the materials." />
-            <SectionJumpNav items={flashcardSections} />
+            <SectionJumpNav
+              items={flashcardSections}
+              title="Jump to flashcards section"
+              subtitle="Click a section to scroll to flashcards or definitions."
+            />
             <div id="flash-cards" className="scroll-mt-24">
               <Flashcards />
             </div>
